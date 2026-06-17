@@ -1,0 +1,569 @@
+
+<style>
+  * { box-sizing: border-box; }
+  .dt-wrap { font-family: var(--font-sans); padding: 1.5rem 1rem 2rem; max-width: 640px; margin: 0 auto; }
+  .dt-breadcrumb { display: flex; flex-wrap: wrap; gap: 4px; font-size: 11px; color: var(--color-text-tertiary); margin-bottom: 1.2rem; min-height: 18px; }
+  .dt-breadcrumb span::after { content: " ›"; }
+  .dt-breadcrumb span:last-child::after { content: ""; color: var(--color-text-secondary); font-weight: 500; }
+  .dt-card { background: var(--color-background-secondary); border: 1px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 1.4rem 1.4rem 1.2rem; }
+  .dt-tag { display: inline-block; font-size: 11px; font-weight: 500; letter-spacing: .03em; padding: 2px 9px; border-radius: 20px; margin-bottom: .7rem; }
+  .tag-curious { background: #E6F1FB; color: #185FA5; }
+  .tag-warning { background: #FAEEDA; color: #854F0B; }
+  .tag-hr { background: #FCEBEB; color: #A32D2D; }
+  .tag-action { background: #EAF3DE; color: #3B6D11; }
+  .tag-start { background: #EEEDFE; color: #534AB7; }
+  @media (prefers-color-scheme: dark) {
+    .tag-curious { background: #0C447C; color: #B5D4F4; }
+    .tag-warning { background: #633806; color: #FAC775; }
+    .tag-hr { background: #791F1F; color: #F7C1C1; }
+    .tag-action { background: #27500A; color: #C0DD97; }
+    .tag-start { background: #3C3489; color: #CECBF6; }
+  }
+  .dt-q { font-size: 16px; font-weight: 500; color: var(--color-text-primary); line-height: 1.45; margin: 0 0 .25rem; }
+  .dt-sub { font-size: 13px; color: var(--color-text-secondary); line-height: 1.5; margin: .4rem 0 1.1rem; }
+  .dt-opts { display: flex; flex-direction: column; gap: .5rem; margin-top: 1rem; }
+  .dt-btn { background: var(--color-background-primary); border: 1px solid var(--color-border-secondary); border-radius: var(--border-radius-md); padding: .65rem 1rem; font-size: 13.5px; color: var(--color-text-primary); cursor: pointer; text-align: left; line-height: 1.4; transition: border-color .15s, background .15s; }
+  .dt-btn:hover { border-color: var(--color-border-primary); background: var(--color-background-secondary); }
+  .dt-outcome { border-left: 3px solid; border-radius: 0 var(--border-radius-md) var(--border-radius-md) 0; padding: .9rem 1rem; font-size: 13px; line-height: 1.6; margin-top: .9rem; }
+  .outcome-curious { border-color: #378ADD; background: #E6F1FB; color: #185FA5; }
+  .outcome-warning { border-color: #BA7517; background: #FAEEDA; color: #854F0B; }
+  .outcome-hr { border-color: #E24B4A; background: #FCEBEB; color: #A32D2D; }
+  .outcome-action { border-color: #639922; background: #EAF3DE; color: #3B6D11; }
+  @media (prefers-color-scheme: dark) {
+    .outcome-curious { border-color: #378ADD; background: #042C53; color: #85B7EB; }
+    .outcome-warning { border-color: #BA7517; background: #412402; color: #FAC775; }
+    .outcome-hr { border-color: #E24B4A; background: #501313; color: #F7C1C1; }
+    .outcome-action { border-color: #639922; background: #173404; color: #C0DD97; }
+  }
+  .dt-outcome strong { display: block; font-weight: 500; margin-bottom: .3rem; font-size: 14px; }
+  .dt-outcome ul { margin: .4rem 0 0; padding-left: 1.2rem; }
+  .dt-outcome li { margin-bottom: .25rem; }
+  .dt-back { background: none; border: none; color: var(--color-text-secondary); font-size: 12.5px; cursor: pointer; padding: 0; margin-top: .9rem; text-decoration: underline; text-underline-offset: 2px; }
+  .dt-back:hover { color: var(--color-text-primary); }
+  .dt-restart { background: none; border: 1px solid var(--color-border-secondary); border-radius: var(--border-radius-md); color: var(--color-text-secondary); font-size: 12px; cursor: pointer; padding: 6px 14px; margin-top: 1rem; }
+  .dt-restart:hover { color: var(--color-text-primary); border-color: var(--color-border-primary); }
+  .dt-header { font-size: 11px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--color-text-tertiary); margin-bottom: 1.2rem; }
+</style>
+
+<div class="dt-wrap">
+  <h2 class="sr-only">GM escalation decision tree — when to handle vs escalate to HR</h2>
+  <div class="dt-header">GM escalation guide</div>
+  <div class="dt-breadcrumb" id="breadcrumb"></div>
+  <div class="dt-card" id="card"></div>
+</div>
+
+<script>
+const tree = {
+  start: {
+    tag: { label: "What happened?", cls: "tag-start" },
+    q: "What kind of situation are you dealing with?",
+    sub: "Choose the closest match to start.",
+    opts: [
+      { label: "Employee is late or no-call/no-show", next: "late" },
+      { label: "Policy or rule violation", next: "policy" },
+      { label: "Performance or work quality issue", next: "perf" },
+      { label: "Behavior, attitude, or misconduct", next: "conduct" },
+      { label: "Conflict between employees", next: "conflict" },
+      { label: "Theft, safety, or harassment", next: "serious" },
+    ]
+  },
+
+  late: {
+    tag: { label: "Lateness / attendance", cls: "tag-curious" },
+    q: "Is this the first or second time, or a clear pattern?",
+    sub: "Always lead with curiosity before punishment. You don't know what happened yet.",
+    opts: [
+      { label: "First or second occurrence", next: "late_first" },
+      { label: "Ongoing pattern (3+ times)", next: "late_pattern" },
+      { label: "No-call, no-show", next: "ncns" },
+    ]
+  },
+
+  late_first: {
+    tag: { label: "Lead with curiosity", cls: "tag-curious" },
+    q: "Pull them aside privately. Ask first.",
+    outcome: {
+      cls: "outcome-curious",
+      title: "Have a private, empathetic check-in",
+      steps: [
+        "\"Hey, I noticed you came in late — is everything okay?\"",
+        "Listen fully before jumping to policy.",
+        "If it was a genuine emergency: acknowledge it, express support, and document that the conversation happened (no formal write-up needed yet).",
+        "If no real reason or they were dismissive: issue a verbal warning and document it. Let them know what the next step looks like if it happens again.",
+        "Your bases are covered as long as you document the conversation."
+      ]
+    }
+  },
+
+  late_pattern: {
+    tag: { label: "Pattern — escalate", cls: "tag-warning" },
+    q: "Have you already issued a verbal warning?",
+    sub: "Progression matters. Each step needs to be documented before moving to the next.",
+    opts: [
+      { label: "No — haven't formally addressed it yet", next: "late_verbal" },
+      { label: "Yes — verbal warning is on file", next: "late_written" },
+      { label: "Written warning already issued too", next: "late_terminate" },
+    ]
+  },
+
+  late_verbal: {
+    tag: { label: "Step 1", cls: "tag-warning" },
+    q: "Issue a verbal warning — and document it.",
+    outcome: {
+      cls: "outcome-warning",
+      title: "Verbal warning conversation",
+      steps: [
+        "Have a private 1:1 — not on the floor.",
+        "State the pattern clearly: \"You've been late X times in Y weeks.\"",
+        "Reference the schedule policy.",
+        "Ask if there's something going on that needs accommodation.",
+        "Document the date, what was said, and that the employee acknowledged it.",
+        "Let them know the next step is a written warning.",
+        "You do NOT need to loop in HR yet — but send a brief heads-up if your company policy requires it."
+      ]
+    }
+  },
+
+  late_written: {
+    tag: { label: "Step 2", cls: "tag-warning" },
+    q: "Issue a written warning — loop in HR.",
+    outcome: {
+      cls: "outcome-warning",
+      title: "Written warning — HR should be in the loop",
+      steps: [
+        "Draft the written warning with specific dates and incidents.",
+        "Have the employee sign it (or note refusal to sign).",
+        "Contact HR to review the write-up before issuing it if possible.",
+        "Keep a copy. Give a copy to the employee. Send a copy to HR.",
+        "Be clear: the next occurrence may result in termination."
+      ]
+    }
+  },
+
+  late_terminate: {
+    tag: { label: "Escalate to HR", cls: "tag-hr" },
+    q: "You've followed the progression. This may be a termination.",
+    outcome: {
+      cls: "outcome-hr",
+      title: "Do not terminate without HR sign-off",
+      steps: [
+        "Contact HR before taking any action.",
+        "Send them the documentation trail: verbal warning, written warning, incident log.",
+        "HR will confirm whether termination is supportable and handle the final meeting process.",
+        "Do not skip this step — terminations without documented progressive discipline create legal exposure."
+      ]
+    }
+  },
+
+  ncns: {
+    tag: { label: "No-call no-show", cls: "tag-warning" },
+    q: "Did the employee eventually contact you or show up?",
+    sub: "NCNS is serious, but context matters.",
+    opts: [
+      { label: "Yes — made contact within 24 hours", next: "ncns_contact" },
+      { label: "No contact and still MIA", next: "ncns_mia" },
+    ]
+  },
+
+  ncns_contact: {
+    tag: { label: "Document + warn", cls: "tag-warning" },
+    q: "Treat it as a formal attendance incident.",
+    outcome: {
+      cls: "outcome-warning",
+      title: "Private conversation + written documentation",
+      steps: [
+        "Lead with: \"What happened? Are you okay?\" — there may be a crisis.",
+        "Once you have context: issue a written warning regardless of reason (NCNS is a policy violation).",
+        "If a medical or family emergency is cited, ask if FMLA or accommodations apply — loop HR in if so.",
+        "Two NCNS incidents in most policies = termination track. Confirm your company's policy with HR."
+      ]
+    }
+  },
+
+  ncns_mia: {
+    tag: { label: "Escalate to HR now", cls: "tag-hr" },
+    q: "No contact after 24–48 hrs = job abandonment risk.",
+    outcome: {
+      cls: "outcome-hr",
+      title: "Contact HR immediately",
+      steps: [
+        "Attempt to reach the employee by phone, text, and emergency contact.",
+        "Document every attempt with timestamps.",
+        "Contact HR — many policies treat 3 consecutive NCNS days as voluntary resignation.",
+        "HR will advise on whether to issue a separation notice."
+      ]
+    }
+  },
+
+  policy: {
+    tag: { label: "Policy violation", cls: "tag-warning" },
+    q: "How serious is the violation?",
+    opts: [
+      { label: "Minor — first time (dress code, phone on floor, late register close)", next: "policy_minor" },
+      { label: "Moderate — recurring or more significant (cash handling error, unauthorized discount)", next: "policy_moderate" },
+      { label: "Serious — clear rules, clear breach (register short, selling to minor)", next: "policy_serious" },
+    ]
+  },
+
+  policy_minor: {
+    tag: { label: "Verbal correction", cls: "tag-curious" },
+    q: "Address it on the spot or in a brief private moment.",
+    outcome: {
+      cls: "outcome-curious",
+      title: "Verbal correction — no write-up yet",
+      steps: [
+        "Be direct but not heavy-handed: \"Hey, just a reminder — we can't have phones on the floor.\"",
+        "Note the date in your own log in case it becomes a pattern.",
+        "If it's the first offense for a newer employee, assume they may not have known.",
+        "No HR loop needed. You're covered as long as you document it for yourself."
+      ]
+    }
+  },
+
+  policy_moderate: {
+    tag: { label: "Verbal or written warning", cls: "tag-warning" },
+    q: "Have you already spoken to them about this?",
+    opts: [
+      { label: "No, first conversation", next: "policy_moderate_first" },
+      { label: "Yes, already warned — it happened again", next: "policy_moderate_repeat" },
+    ]
+  },
+
+  policy_moderate_first: {
+    outcome: {
+      cls: "outcome-warning",
+      title: "Verbal warning + document",
+      steps: [
+        "Private conversation — review what the policy actually says.",
+        "Ask if there was confusion or a misunderstanding.",
+        "Issue a verbal warning and document it. No HR loop needed yet.",
+        "For cash handling errors: determine if it's carelessness vs. potential theft. If theft is possible, escalate now."
+      ]
+    }
+  },
+
+  policy_moderate_repeat: {
+    tag: { label: "Written warning + HR loop", cls: "tag-warning" },
+    outcome: {
+      cls: "outcome-warning",
+      title: "Written warning — heads-up to HR",
+      steps: [
+        "Reference prior verbal warning in the write-up.",
+        "Be specific: dates, incidents, policy language.",
+        "Send to HR for review before issuing.",
+        "Let the employee know continued violations may lead to termination."
+      ]
+    }
+  },
+
+  policy_serious: {
+    tag: { label: "Escalate to HR", cls: "tag-hr" },
+    q: "Serious violations may require suspension or immediate termination.",
+    outcome: {
+      cls: "outcome-hr",
+      title: "Contact HR before acting",
+      steps: [
+        "Do NOT terminate on the spot — even if it's obviously a fireable offense.",
+        "Remove the employee from their shift if needed for safety or integrity (\"Step off the floor with me\").",
+        "Call or message HR immediately with the facts.",
+        "HR will determine: written warning, suspension, or termination.",
+        "For selling to a minor — this is also a regulatory incident. Notify your compliance lead."
+      ]
+    }
+  },
+
+  perf: {
+    tag: { label: "Performance", cls: "tag-warning" },
+    q: "Is this a skills gap or a will/effort issue?",
+    sub: "The intervention looks different depending on the root cause.",
+    opts: [
+      { label: "They seem to be trying but struggling (training gap)", next: "perf_skill" },
+      { label: "They're capable but not executing (attitude or disengagement)", next: "perf_will" },
+      { label: "Persistent poor performance despite coaching", next: "perf_pip" },
+    ]
+  },
+
+  perf_skill: {
+    tag: { label: "Coach and support", cls: "tag-curious" },
+    outcome: {
+      cls: "outcome-curious",
+      title: "Training-first approach",
+      steps: [
+        "Have a direct but supportive 1:1: \"I've noticed X — where do you feel like you need more support?\"",
+        "Identify the specific gap and set a short training plan (buddy shift, checklist, role-play).",
+        "Check in within 1–2 weeks to see improvement.",
+        "Document: what you observed, what support was offered, and the timeline.",
+        "No HR loop needed yet — but keep notes in case this becomes a pattern."
+      ]
+    }
+  },
+
+  perf_will: {
+    tag: { label: "Direct conversation", cls: "tag-warning" },
+    outcome: {
+      cls: "outcome-warning",
+      title: "Set clear expectations with consequences",
+      steps: [
+        "Be candid: \"You know how to do this — I need to see it consistently.\"",
+        "Define what 'good' looks like and set a clear check-in timeline.",
+        "Issue a verbal warning if this has been discussed before.",
+        "Document everything. A written warning may follow if no improvement.",
+        "Loop in HR if disengagement is creating team or business impact."
+      ]
+    }
+  },
+
+  perf_pip: {
+    tag: { label: "HR involvement", cls: "tag-hr" },
+    outcome: {
+      cls: "outcome-hr",
+      title: "Formal performance improvement plan — HR leads",
+      steps: [
+        "This is the point where HR takes the wheel.",
+        "Contact HR with your documentation: what was observed, what coaching happened, what didn't improve.",
+        "HR will help draft a PIP with specific goals, timelines, and consequences.",
+        "You'll be involved in check-ins, but HR owns the formal process.",
+        "Do not issue a PIP on your own — it has legal weight and needs to follow company templates."
+      ]
+    }
+  },
+
+  conduct: {
+    tag: { label: "Conduct / behavior", cls: "tag-warning" },
+    q: "What kind of conduct issue?",
+    opts: [
+      { label: "Attitude, tone, or insubordination", next: "conduct_attitude" },
+      { label: "Inappropriate language or behavior toward coworker", next: "conduct_inappropriate" },
+      { label: "Threatening, hostile, or aggressive behavior", next: "conduct_hostile" },
+    ]
+  },
+
+  conduct_attitude: {
+    tag: { label: "Private conversation first", cls: "tag-curious" },
+    outcome: {
+      cls: "outcome-curious",
+      title: "Have the hard conversation early",
+      steps: [
+        "Don't let it fester. Pull them aside privately — not right after the incident if emotions are hot.",
+        "\"I want to talk about how things went earlier. Can you walk me through what was going on for you?\"",
+        "Name the behavior specifically, not the personality: \"The tone in that moment\" not \"your attitude.\"",
+        "If it's a one-time flare-up, a verbal conversation may be enough.",
+        "If it's recurring or directed at customers: verbal warning + document.",
+        "If insubordination was public or severe, escalate to written warning immediately."
+      ]
+    }
+  },
+
+  conduct_inappropriate: {
+    tag: { label: "Document + HR heads-up", cls: "tag-warning" },
+    outcome: {
+      cls: "outcome-warning",
+      title: "Written documentation — bring in HR for review",
+      steps: [
+        "Separate the employees if needed.",
+        "Talk to both parties separately — don't assume you know the full picture.",
+        "Document what was witnessed or reported: exact words if possible, date, time, who was present.",
+        "Issue a written warning.",
+        "Loop HR in — this is in harassment territory and needs to be handled by the book.",
+        "Do not make promises to either party about outcomes while HR is reviewing."
+      ]
+    }
+  },
+
+  conduct_hostile: {
+    tag: { label: "Escalate to HR now", cls: "tag-hr" },
+    outcome: {
+      cls: "outcome-hr",
+      title: "This is an immediate HR and safety situation",
+      steps: [
+        "Remove the employee from the floor immediately if safe to do so.",
+        "If there's any physical threat or altercation — call the police first, then HR.",
+        "Document everything: witnesses, exact words or actions, timeline.",
+        "Do NOT attempt to mediate or 'handle it yourself.'",
+        "HR will determine whether this results in suspension or termination.",
+        "Follow up with affected employees — they may need support."
+      ]
+    }
+  },
+
+  conflict: {
+    tag: { label: "Employee conflict", cls: "tag-curious" },
+    q: "Is this a personality clash or something more serious?",
+    opts: [
+      { label: "Friction between coworkers — seems personal/petty", next: "conflict_minor" },
+      { label: "Work-related disagreement affecting the team", next: "conflict_work" },
+      { label: "One employee claims the other is creating a hostile environment", next: "conflict_hostile" },
+    ]
+  },
+
+  conflict_minor: {
+    tag: { label: "You can mediate this", cls: "tag-curious" },
+    outcome: {
+      cls: "outcome-curious",
+      title: "GM-led mediation — no HR needed yet",
+      steps: [
+        "Talk to each person separately first to get their side.",
+        "Bring them together only when you understand the issue.",
+        "Set clear behavioral expectations: \"On this floor, we keep it professional regardless of personal feelings.\"",
+        "Document that the conversation happened.",
+        "Monitor closely. If it resurfaces: written warning and HR loop."
+      ]
+    }
+  },
+
+  conflict_work: {
+    tag: { label: "Clarify and redirect", cls: "tag-curious" },
+    outcome: {
+      cls: "outcome-curious",
+      title: "Address the root cause operationally",
+      steps: [
+        "Meet with both together — this is a team problem, not an interpersonal one.",
+        "Identify whether the conflict is about roles, workload, or communication.",
+        "Set clear boundaries and expectations going forward.",
+        "Document the meeting.",
+        "If it continues to affect team output, escalate to HR for mediation support."
+      ]
+    }
+  },
+
+  conflict_hostile: {
+    tag: { label: "Escalate to HR", cls: "tag-hr" },
+    outcome: {
+      cls: "outcome-hr",
+      title: "This requires an HR investigation",
+      steps: [
+        "Take the complaint seriously — do not dismiss or minimize it.",
+        "Do not investigate it yourself. HR must lead.",
+        "Document what was reported to you and when.",
+        "Assure the reporting employee you are escalating and that retaliation won't be tolerated.",
+        "Do not tell the other employee who made the complaint until HR advises you to.",
+        "This is also a potential legal liability — HR must own it from this point."
+      ]
+    }
+  },
+
+  serious: {
+    tag: { label: "Serious incident", cls: "tag-hr" },
+    q: "What type of serious incident?",
+    opts: [
+      { label: "Suspected or confirmed theft", next: "serious_theft" },
+      { label: "Workplace safety incident or injury", next: "serious_safety" },
+      { label: "Harassment complaint (sexual or otherwise)", next: "serious_harassment" },
+    ]
+  },
+
+  serious_theft: {
+    tag: { label: "HR + Legal", cls: "tag-hr" },
+    outcome: {
+      cls: "outcome-hr",
+      title: "Do not confront or accuse — escalate immediately",
+      steps: [
+        "Do not accuse the employee directly until HR and LP (loss prevention) are involved.",
+        "Secure any evidence: camera footage, transaction logs, inventory counts.",
+        "Contact HR and your LP contact right away.",
+        "If you must remove the employee from the floor, frame it neutrally: \"We need to sort something out — can you step with me?\"",
+        "HR and LP will determine next steps. Your job is evidence preservation and escalation."
+      ]
+    }
+  },
+
+  serious_safety: {
+    tag: { label: "Immediate action", cls: "tag-hr" },
+    outcome: {
+      cls: "outcome-hr",
+      title: "Safety incident protocol",
+      steps: [
+        "If there's an injury: get the employee medical attention first.",
+        "Secure the scene — don't let anyone disturb it until documented.",
+        "File an incident report immediately — date, time, what happened, who was present.",
+        "Contact HR and your DM within the hour.",
+        "Depending on severity, OSHA reporting may be required — HR will advise.",
+        "Do not admit fault or make statements about liability to anyone."
+      ]
+    }
+  },
+
+  serious_harassment: {
+    tag: { label: "HR leads — full stop", cls: "tag-hr" },
+    outcome: {
+      cls: "outcome-hr",
+      title: "This is an HR-owned investigation, not a GM conversation",
+      steps: [
+        "Receive the complaint, thank the employee for coming forward, and tell them you're escalating to HR immediately.",
+        "Do not investigate, mediate, or promise any specific outcome.",
+        "Contact HR the same day — ideally within the hour.",
+        "Document only the basic facts: who came to you, when, and what they said they experienced.",
+        "Remind the reporting employee they are protected from retaliation.",
+        "HR will lead the investigation and determine next steps."
+      ]
+    }
+  }
+};
+
+let history = [];
+let current = 'start';
+
+function getNode(id) { return tree[id]; }
+
+function render() {
+  const node = getNode(current);
+  if (!node) return;
+
+  const bcEl = document.getElementById('breadcrumb');
+  bcEl.innerHTML = history.map((id, i) => {
+    const n = getNode(id);
+    const label = n?.tag?.label || id;
+    return `<span>${label}</span>`;
+  }).join('') + (node.tag ? `<span>${node.tag.label}</span>` : '');
+
+  const card = document.getElementById('card');
+  let html = '';
+
+  if (node.tag) {
+    html += `<div class="dt-tag ${node.tag.cls}">${node.tag.label}</div>`;
+  }
+
+  html += `<div class="dt-q">${node.q || ''}</div>`;
+  if (node.sub) html += `<div class="dt-sub">${node.sub}</div>`;
+
+  if (node.outcome) {
+    const o = node.outcome;
+    html += `<div class="dt-outcome ${o.cls}"><strong>${o.title}</strong><ul>${o.steps.map(s => `<li>${s}</li>`).join('')}</ul></div>`;
+    html += `<div style="margin-top:1.1rem;display:flex;gap:.7rem;align-items:center;flex-wrap:wrap">`;
+    if (history.length > 0) html += `<button class="dt-back" onclick="goBack()">← Back</button>`;
+    html += `<button class="dt-restart" onclick="restart()">Start over</button>`;
+    html += `</div>`;
+  }
+
+  if (node.opts) {
+    html += `<div class="dt-opts">`;
+    node.opts.forEach(opt => {
+      html += `<button class="dt-btn" onclick="go('${opt.next}')">${opt.label}</button>`;
+    });
+    html += `</div>`;
+    if (history.length > 0) html += `<button class="dt-back" onclick="goBack()">← Back</button>`;
+  }
+
+  card.innerHTML = html;
+}
+
+function go(id) {
+  history.push(current);
+  current = id;
+  render();
+}
+
+function goBack() {
+  if (history.length === 0) return;
+  current = history.pop();
+  render();
+}
+
+function restart() {
+  history = [];
+  current = 'start';
+  render();
+}
+
+render();
+</script>
